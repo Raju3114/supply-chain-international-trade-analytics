@@ -12,14 +12,14 @@ USE supply_chain_dw;
 CREATE TABLE dim_date (
     date_key INT PRIMARY KEY,                 -- YYYYMMDD
     full_date DATE NOT NULL,
-    year INT NOT NULL,
-    quarter VARCHAR(10) NOT NULL,
-    month INT NOT NULL,
+    `year` INT NOT NULL,
+    `quarter` VARCHAR(10) NOT NULL,
+    `month` INT NOT NULL,
     month_name VARCHAR(20) NOT NULL,
-    year_month VARCHAR(7) NOT NULL,
+    `year_month` VARCHAR(7) NOT NULL,
     day_of_month INT NOT NULL,
     day_of_week VARCHAR(20) NOT NULL,
-    INDEX idx_year_month (year_month)
+    INDEX idx_year_month (`year_month`)
 ) ENGINE=InnoDB;
 
 -- 2. Product Dimension

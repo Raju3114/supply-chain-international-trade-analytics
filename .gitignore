@@ -42,10 +42,12 @@ data/processed/*.parquet
 data/processed/*.csv
 !data/raw/DescriptionDataCoSupplyChain.csv
 
-# SQLite DB files
+# SQLite & MySQL data directories
 *.db
 *.sqlite
 *.sqlite3
+data/mysql_data/
+*.log
 
 # OS generated
 Thumbs.db

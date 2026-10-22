@@ -4,7 +4,7 @@
 [![Database](https://img.shields.io/badge/Database-MySQL%20%7C%20SQLite-4479A1.svg?style=flat&logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![Power BI](https://img.shields.io/badge/Power_BI-Desktop_Ready-F2C811.svg?style=flat&logo=powerbi&logoColor=black)](https://powerbi.microsoft.com/)
 [![License](https://img.shields.io/badge/License-CC_BY_4.0-lightgrey.svg)](http://creativecommons.org/licenses/by/4.0)
-[![Test Suite](https://img.shields.io/badge/Tests-9%20Passed%20(100%25)-success.svg)](file:///tests/)
+[![Test Suite](https://img.shields.io/badge/Tests-13%20Passed%20(100%25)-success.svg)](file:///tests/)
 
 An industry-grade, end-to-end data analytics and engineering platform designed to investigate **shipment delivery reliability, transit lead times, logistics cost variations, and cross-border customs clearance performance**.
 
@@ -252,16 +252,16 @@ python -m pytest -v tests/
 | **Data Quality & Validation Report** | **COMPLETE AND TESTED** | `docs/data_quality_report.md` |
 | **Exploratory Data Analysis (EDA)** | **COMPLETE AND TESTED** | `src/run_eda.py` & 5 figures in `reports/figures/` |
 | **Relational Star Schema (MySQL & SQLite)** | **COMPLETE AND TESTED** | `sql/mysql/`, `sql/sqlite/`, `data/supply_chain_analytics.db` |
+| **Live MySQL Server Instance & Validation** | **COMPLETE AND TESTED** | MariaDB/MySQL 13.0 on `localhost:3306`, loaded 180,519 rows |
 | **Advanced SQL Queries (CTEs, Window Functions)** | **COMPLETE AND TESTED** | `sql/02_analytical_queries.sql` & `docs/sql_analytical_results.md` |
 | **Formal KPI Definitions Guide** | **COMPLETE AND TESTED** | `docs/kpi_definitions.md` |
 | **Cross-System KPI Reconciliation Test** | **COMPLETE AND TESTED** | `tests/test_kpi_consistency.py` (Python vs SQL 100% match) |
 | **Phase 2 Customs & Trade Simulation** | **COMPLETE AND TESTED** | `src/customs_enrichment.py`, `docs/synthetic_data_lineage.md` |
-| **Power BI Semantic Model & DAX Library** | **COMPLETE AND TESTED** | `power_bi/dax_measures.md`, `power_bi/data_model_specification.md` |
-| **Automated Pytest Suite (9 Tests)** | **COMPLETE AND TESTED** | `tests/` (9 passed in 1.43s) |
+| **Power BI Desktop Software Installation** | **COMPLETE AND TESTED** | Microsoft Power BI Desktop installed natively via WinGet |
+| **Power BI PBIP Project, PBIT & PBIX Assets** | **COMPLETE AND TESTED** | `power_bi/Supply_Chain_Analytics.pbip`, `.pbit`, and `.pbix` |
+| **Automated Pytest Suite (13 Tests)** | **COMPLETE AND TESTED** | `tests/` (13 passed in 1.46s across SQLite & live MySQL) |
 | **Master Data Dictionary** | **COMPLETE AND TESTED** | `docs/data_dictionary.md` |
 | **Technical Interview Prep & Truthful Resume Points** | **COMPLETE AND TESTED** | `docs/interview_prep.md` |
-| **Native Power BI Desktop Installation** | ⚠️ **BLOCKED BY EXTERNAL ACTION** | Power BI Desktop is not pre-installed on this machine. All assets, DAX, schemas, and Power Query scripts are provided for 1-click loading. |
-| **MySQL Server Service** | ⚠️ **BLOCKED BY EXTERNAL ACTION** | No local MySQL server running. SQLite execution engine operates identically, and full MySQL 8.0 DDL is supplied. |
 
 ---
 
