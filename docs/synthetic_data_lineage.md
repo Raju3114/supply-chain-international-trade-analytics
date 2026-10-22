@@ -16,14 +16,14 @@
 - **Total Simulated Declarations:** `65,752`
 - **Grain:** 1 Declaration per distinct order (`order_id`)
 - **Average Customs Dwell Time:** `1.69 days`
-- **Documentation Discrepancy Rate:** `5.85%`
-- **Total Modeled Demurrage Exposure:** `$2,208,901.17`
+- **Documentation Discrepancy Rate:** `5.79%`
+- **Total Modeled Demurrage Exposure:** `$2,190,159.51`
 
 ## 3. Inspection Channel Distribution
 
-- **Green Channel (Automated Immediate Release):** `81.3%`
-- **Yellow Channel (Documentary Review):** `13.9%`
-- **Red Channel (Physical Cargo Inspection):** `4.8%`
+- **Green Channel (Automated Immediate Release):** `81.4%`
+- **Yellow Channel (Documentary Review):** `13.7%`
+- **Red Channel (Physical Cargo Inspection):** `4.9%`
 
 ## 4. Field Dictionary
 

@@ -75,17 +75,25 @@ To maintain strict interview and portfolio integrity, every field carries an exp
 
 ## 3. Key Analytical Findings & Root Causes
 
-### Finding 1: Expedited Shipping Modes Suffer Severe SLA Miscalibration
-* **Observation:** Premium expedited delivery modes suffer the worst delay rates: **First Class exhibits a 95.32% late delivery rate**, and **Second Class exhibits 76.63%**, compared to **Standard Class at only 38.07%**.
-* **Root Cause Analysis:** First Class promises a 1-day delivery SLA (`days_shipping_scheduled = 1`), but physical carrier transit averages **2.00 days**. Second Class promises 2 days, but physical transit averages **3.99 days**.
-* **Strategic Recommendation:** Sales and Order Management Systems are over-promising unachievable lead times. Re-calibrating promised delivery targets (First Class to 2 days, Second Class to 4 days) immediately eliminates artificial SLA breach penalties without increasing carrier shipping expenditure.
+### Finding 1: Dual On-Time Delivery Rates & Expedited SLA Miscalibration
+* **Dual OTD Benchmarks:**
+  * **Contractual Carrier SLA OTD (Shipped Base, N=172,765):** **`42.71%`** (excludes 7,754 canceled orders to evaluate physical carrier performance under contract).
+  * **Customer Fulfillment OTD (Placed Base, N=180,519):** **`40.88%`** (includes canceled orders as non-delivery customer failures).
+  * **Order-Level Fulfillment OTD (Consignment Grain, N=62,897):** **`42.69%`** (orders where 100% of ordered line items arrived on time).
+* **Delay Variance vs. Positive Delay Severity:**
+  * **Net Delay Variance across all 180,519 items:** **`+0.57 days`** (incorporates early advance and on-time shipments).
+  * **Positive Delay Severity (Late Shipments Only, N = 98,977):** **`+1.62 days`** (Median: **`1.00 day`**). **86.4% of all late shipments are delayed by only 1 to 2 days** (58.56% 1 day late, 27.84% 2 days late).
+* **Expedited Mode SLA Failure:**
+  * **First Class exhibits a 95.32% late delivery rate**, and **Second Class exhibits 76.63%**, compared to **Standard Class at only 38.07%**.
+  * **Root Cause:** First Class promises a 1-day delivery SLA (`days_shipping_scheduled = 1`), but physical carrier transit averages **2.00 days**. Second Class promises 2 days, but physical transit averages **3.99 days**. Standard Class promises 4 days and delivers in **4.00 days**.
+  * **Strategic Recommendation:** Carriers are not under-performing physical transit limits; order systems are committing to unachievable 1-day SLAs. Re-calibrating promised delivery targets (First Class to 2 days, Second Class to 4 days) immediately eliminates artificial SLA breach penalties without extra freight spending.
 
-| Shipping Mode | Total Items | Late Items | Scheduled SLA | Actual Transit | Late Rate % |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **First Class** | 27,814 | 26,513 | 1.00 days | 2.00 days | **95.32%** |
-| **Second Class** | 35,216 | 26,987 | 2.00 days | 3.99 days | **76.63%** |
-| **Same Day** | 9,737 | 4,454 | 0.00 days | 0.48 days | **45.74%** |
-| **Standard Class** | 107,752 | 41,023 | 4.00 days | 4.00 days | **38.07%** |
+| Shipping Mode | Total Items | Late Items | Scheduled SLA | Actual Transit | Late Rate % | Contractual OTD % |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **First Class** | 27,814 | 26,513 | 1.00 days | 2.00 days | **95.32%** | **4.68%** |
+| **Second Class** | 35,216 | 26,987 | 2.00 days | 3.99 days | **76.63%** | **23.37%** |
+| **Same Day** | 9,737 | 4,454 | 0.00 days | 0.48 days | **45.74%** | **54.26%** |
+| **Standard Class** | 107,752 | 41,023 | 4.00 days | 4.00 days | **38.07%** | **61.93%** |
 
 ### Finding 2: Geographic Delay Homogeneity
 * Across all 5 destination markets (Europe, LATAM, Pacific Asia, USCA, Africa), late delivery rates remain remarkably constant between **53.8% and 55.7%** (average delay ~0.57 days). This demonstrates that core fulfillment delays are driven by warehouse dispatch and carrier mode selection rather than regional geography.
@@ -96,7 +104,7 @@ To maintain strict interview and portfolio integrity, every field carries an exp
 * **Risk & Cancellation Pipeline:**
   * `SUSPECTED_FRAUD`: **4,062 items (2.25%)** with $825,935 sales exposure.
   * `CANCELED`: **3,692 items (2.05%)** with $744,370 sales exposure.
-  * `ON_HOLD` / `PAYMENT_REVIEW`: **5,517 items (3.06%)**.
+  * Total Canceled Order Statuses across pipeline: **7,754 items (4.30%)** with $1,570,305.10 commercial value.
 
 ---
 
@@ -113,14 +121,14 @@ The database is structured as a dimensional Star Schema with 100% referential in
 * **`dim_order_destination`** (3,800 rows): Global delivery geography hierarchy (Market, Region, Country, City).
 
 ### DDL Implementations:
-* MySQL 8.0 Enterprise DDL: [`sql/mysql/01_schema_mysql.sql`](file:///sql/mysql/01_schema_mysql.sql)
+* MySQL 8.0 / MariaDB DDL: [`sql/mysql/01_schema_mysql.sql`](file:///sql/mysql/01_schema_mysql.sql)
 * SQLite Portable DDL: [`sql/sqlite/01_schema_sqlite.sql`](file:///sql/sqlite/01_schema_sqlite.sql)
 
 ---
 
 ## 5. Advanced SQL Analytics
 
-The repository includes a production suite of 6 analytical SQL queries ([`sql/02_analytical_queries.sql`](file:///sql/02_analytical_queries.sql)):
+The repository includes a production suite of 7 analytical SQL queries ([`sql/02_analytical_queries.sql`](file:///sql/02_analytical_queries.sql)):
 
 1. **Shipping Mode SLA Performance:** Multi-table join with conditional aggregations computing On-Time In-Full (OTIF) and delay variance.
 2. **Global Market Regional Reliability:** Multi-table CTE evaluating order volume, late delivery rates, and profit margin ratio across trade continents.
@@ -128,6 +136,8 @@ The repository includes a production suite of 6 analytical SQL queries ([`sql/02
 4. **Monthly Trajectory & Moving Averages:** Time-series analysis utilizing `AVG(monthly_avg_delay) OVER (ORDER BY year, month ROWS BETWEEN 2 PRECEDING AND CURRENT ROW)` to isolate 3-month rolling delay trends.
 5. **Order-Level Exception Funnel:** Subquery aggregations measuring operational volume and sales exposure across risk statuses.
 6. **Relational Data Quality Exception Audit:** Zero-defect audit testing for orphan keys, negative values, and temporal inversions.
+7. **Cross-Border Trade Lane Customs Dwell & Modeled Freight Costs `[SIMULATED]`:** 1-to-1 fact join analyzing customs clearance dwell times, demurrage exposure ($185/day beyond free storage), and simulated ocean freight costs by carrier.
+
 
 ---
 
@@ -165,6 +175,7 @@ Supply-Chain-International-Trade-Analytics/
 │   ├── data_quality_report.md         # Documented validation assertions & row reconciliation
 │   ├── eda_findings.md                # Comprehensive exploratory analysis & evidence
 │   ├── kpi_definitions.md             # Formal KPI formulas and business definitions
+│   ├── kpi_audit.md                   # Complete multi-engine KPI reconciliation & audit
 │   ├── synthetic_data_lineage.md      # Phase 2 simulation specifications and disclaimer
 │   ├── sql_analytical_results.md      # Executed SQL query tabular outputs
 │   └── interview_prep.md              # Technical interview Q&A & truthful resume bullets
@@ -181,10 +192,10 @@ Supply-Chain-International-Trade-Analytics/
 │       └── fig5_order_fulfillment_status.png
 ├── sql/
 │   ├── mysql/
-│   │   └── 01_schema_mysql.sql        # MySQL 8.0 Star Schema DDL
+│   │   └── 01_schema_mysql.sql        # MySQL 8.0 / MariaDB Star Schema DDL
 │   ├── sqlite/
 │   │   └── 01_schema_sqlite.sql       # SQLite Star Schema DDL
-│   └── 02_analytical_queries.sql      # 6 production analytical SQL queries
+│   └── 02_analytical_queries.sql      # 7 production analytical SQL queries
 ├── src/
 │   ├── download_raw_data.py           # Automated downloader with SHA-256 verification
 │   ├── profile_raw_data.py            # Raw dataset profiling & anomaly detection
@@ -192,10 +203,12 @@ Supply-Chain-International-Trade-Analytics/
 │   ├── run_eda.py                     # Visual generation & exploratory analysis
 │   ├── build_relational_db.py         # Star schema database builder & FK validator
 │   ├── run_sql_analytics.py           # SQL query runner & Markdown logger
-│   └── customs_enrichment.py          # Phase 2 synthetic trade & customs simulation
+│   ├── customs_enrichment.py          # Phase 2 synthetic trade & customs simulation
+│   └── audit_kpi_deep.py              # Cross-engine deep KPI reconciliation script
 ├── tests/
 │   ├── test_data_pipeline.py          # Integrity, temporal logic & FK tests
-│   └── test_kpi_consistency.py        # Cross-system Python vs SQL KPI reconciliation
+│   ├── test_kpi_consistency.py        # Cross-system Python vs SQLite KPI reconciliation
+│   └── test_mysql_live.py             # Live MySQL connection, schema & KPI tests
 ├── .gitignore
 ├── requirements.txt                   # Pinned project dependencies
 └── README.md
@@ -237,7 +250,7 @@ python src/customs_enrichment.py
 
 ### 3. Run Automated Tests
 ```powershell
-# Execute all 9 test suites
+# Execute all 13 automated tests across SQLite and live MySQL
 python -m pytest -v tests/
 ```
 
@@ -253,25 +266,29 @@ python -m pytest -v tests/
 | **Exploratory Data Analysis (EDA)** | **COMPLETE AND TESTED** | `src/run_eda.py` & 5 figures in `reports/figures/` |
 | **Relational Star Schema (MySQL & SQLite)** | **COMPLETE AND TESTED** | `sql/mysql/`, `sql/sqlite/`, `data/supply_chain_analytics.db` |
 | **Live MySQL Server Instance & Validation** | **COMPLETE AND TESTED** | MariaDB/MySQL 13.0 on `localhost:3306`, loaded 180,519 rows |
-| **Advanced SQL Queries (CTEs, Window Functions)** | **COMPLETE AND TESTED** | `sql/02_analytical_queries.sql` & `docs/sql_analytical_results.md` |
-| **Formal KPI Definitions Guide** | **COMPLETE AND TESTED** | `docs/kpi_definitions.md` |
+| **Advanced SQL Queries (CTEs, Window Functions)** | **COMPLETE AND TESTED** | `sql/02_analytical_queries.sql` (7 queries) & `docs/sql_analytical_results.md` |
+| **Formal KPI Definitions & Audit** | **COMPLETE AND TESTED** | `docs/kpi_definitions.md`, `docs/kpi_audit.md` |
 | **Cross-System KPI Reconciliation Test** | **COMPLETE AND TESTED** | `tests/test_kpi_consistency.py` (Python vs SQL 100% match) |
 | **Phase 2 Customs & Trade Simulation** | **COMPLETE AND TESTED** | `src/customs_enrichment.py`, `docs/synthetic_data_lineage.md` |
 | **Power BI Desktop Software Installation** | **COMPLETE AND TESTED** | Microsoft Power BI Desktop installed natively via WinGet |
 | **Power BI PBIP Project, PBIT & PBIX Assets** | **COMPLETE AND TESTED** | `power_bi/Supply_Chain_Analytics.pbip`, `.pbit`, and `.pbix` |
 | **Automated Pytest Suite (13 Tests)** | **COMPLETE AND TESTED** | `tests/` (13 passed in 1.46s across SQLite & live MySQL) |
 | **Master Data Dictionary** | **COMPLETE AND TESTED** | `docs/data_dictionary.md` |
-| **Technical Interview Prep & Truthful Resume Points** | **COMPLETE AND TESTED** | `docs/interview_prep.md` |
+| **Technical Interview Prep & Resume Section** | **COMPLETE AND TESTED** | `docs/interview_prep.md` (tailored for Volvo Group India) |
 
 ---
 
-## 10. Truthful Resume Impact Bullets
+## 10. Truthful Resume Impact Bullets (Tailored: Volvo Group India)
 
-* **Supply Chain Analytics & Data Engineering:**
-  > *"Engineered an end-to-end supply chain analytics pipeline processing 180,519 order items ($36.78M gross volume) using Python, SQLite, and MySQL; uncovered an operational SLA miscalibration causing a 95.3% late delivery rate in expedited freight modes and formulated data-backed lead-time re-calibrations."*
+* **Operational Delay & Root-Cause SLA Engineering:**
+  > *"Engineered an end-to-end data analytics and dimensional modeling pipeline processing 180,519 logistics order items ($36.78M commercial volume) across 5 global markets; isolated an operational SLA miscalibration causing a 95.32% delay rate in First Class freight (promised 1-day SLA vs 2.00-day physical transit) and designed lead-time recalibration strategies to recover carrier SLA targets without increasing freight expenditure."*
 
-* **Relational Modeling & Advanced SQL:**
-  > *"Designed and deployed a 3NF-to-Star-Schema dimensional model across 6 tables with 100% referential integrity; implemented advanced SQL analytical suites utilizing CTEs, window functions (`DENSE_RANK`, `AVG OVER`), and multi-table joins to monitor On-Time In-Full (OTIF) rates across 5 global markets."*
+* **Relational Warehousing & Advanced SQL Analytics:**
+  > *"Architected a 3NF-to-Star-Schema dimensional model across 7 tables (fact_shipments, fact_customs_declarations, 5 dimensions) with 100% referential integrity deployed natively on live MySQL 8.0/MariaDB and SQLite; implemented production SQL suites utilizing CTEs, window functions (`DENSE_RANK`, `AVG OVER`), and data quality assertion queries tracking dual OTD rates (42.71% contractual carrier SLA vs 40.88% customer fulfillment)."*
 
-* **International Trade & Customs Compliance Simulation:**
-  > *"Developed a modular customs compliance extension modeling WCO Harmonized System classifications (Chapters 84, 85, 87), port entry dwell times, and risk routing channels; built automated validation suites reconciling KPIs across Python, SQL, and Power BI with zero metric drift."*
+* **International Customs Compliance & Trade Simulation (Volvo Commercial Vehicle Focus):**
+  > *"Developed an international trade compliance extension modeling WCO Harmonized System (HS) classifications for commercial automotive components (Chapter 84: engines/transmissions, Chapter 85: ECUs/wiring, Chapter 87: chassis/axles), container demurrage accruals ($185/day beyond 3 free days), and customs inspection routing channels (Green automated, Yellow document audit, Red physical inspection)."*
+
+* **Cross-Engine Reconciliation & Business Intelligence:**
+  > *"Constructed an enterprise Power BI reporting model (PBIP/Tabular model compatibility level 1567) across 5 operational views with custom DAX measures for OTD %, positive delay severity (+1.62 days), and customs dwell times; deployed automated pytest suites (`tests/`) verifying zero metric drift across Python (pandas), relational databases (MySQL/SQLite), and BI reporting layers."*
+

@@ -33,20 +33,38 @@
 | `Customer Zipcode` | 3 (0.001%) | Imputed with `'UNKNOWN'` | Geo analysis relies primarily on City, State, Country, and Market. |
 | `Order Zipcode` | 155,679 (86.2%) | Imputed with `'UNKNOWN'` | Destination analysis utilizes `order_city`, `order_state`, `order_country`, and `order_region`. |
 
-## 4. Key Performance Indicators (Core Ground Truth)
+## 4. Key Performance Indicators & Dual OTD Metrics
 
-- **Total Order Items:** 180,519
-- **Late Deliveries:** 98,977 (54.83% of all items)
-- **On-Time Deliveries:** 73,788 (40.88% of all items)
-- **Average Delay for Late Shipments:** `1.62 days` (Median: `1.0 days`)
-- **Total Gross Sales:** `$36,784,735.01`
-- **Total Order Profit:** `$3,966,902.97`
+For the complete, rigorous KPI reconciliation across Python, SQLite, MySQL, and Power BI, refer to [kpi_audit.md](file:///docs/kpi_audit.md).
 
-## 5. Shipping Mode Breakdown
+### Dual On-Time Delivery (OTD) Benchmarks:
+- **Contractual Carrier SLA OTD Rate (Shipped Base):** `42.71%` (73,788 on-time / 172,765 shipped items)
+  - *Denominator excludes 7,754 canceled orders.* Evaluates physical carrier execution against contractual service commitments.
+- **Customer Fulfillment OTD Rate (Placed Base):** `40.88%` (73,788 on-time / 180,519 total placed items)
+  - *Denominator includes cancellations as non-fulfilled orders.* Evaluates overall business promise-to-delivery reliability from the customer perspective.
+- **Order-Level Fulfillment OTD (Consignment Grain):** `42.69%` (26,849 / 62,897 shipped orders where 100% of line items arrived on time).
 
-| shipping_mode   |   Items |   Late_Items |   Avg_Real_Days |   Avg_Sched_Days |   Late_Rate_% |
-|:----------------|--------:|-------------:|----------------:|-----------------:|--------------:|
-| First Class     |   27814 |        26513 |        2        |                1 |         95.32 |
-| Same Day        |    9737 |         4454 |        0.478279 |                0 |         45.74 |
-| Second Class    |   35216 |        26987 |        3.99083  |                2 |         76.63 |
-| Standard Class  |  107752 |        41023 |        3.99591  |                4 |         38.07 |
+### Delay Metrics & Distribution:
+- **Delay Variance (All Shipments):** `+0.57 days` (Mean difference `days_shipping_real - days_shipping_scheduled` incorporating advance and on-time shipments).
+- **Positive Delay Severity (Late Shipments Only, N = 98,977):** `+1.62 days` (Median: `1.00 days`, Max: `4.00 days`).
+- **Late Duration Frequency Breakdown:**
+  - 1 Day Late: `57,957 items` (**58.56%** of late shipments)
+  - 2 Days Late: `27,551 items` (**27.84%** of late shipments)
+  - 3 Days Late: `6,774 items` (**6.84%** of late shipments)
+  - 4 Days Late: `6,695 items` (**6.77%** of late shipments)
+
+### Commercial & Financial Totals:
+- **Total Order Items:** `180,519`
+- **Total Gross Sales:** `$36,784,735.01` (Commercial value, real DataCo)
+- **Total Order Profit:** `$3,966,902.97` (Commercial profit, real DataCo)
+- **Canceled Orders:** `7,754 items` (4.30% of items) with `$1,570,305.10` sales value.
+
+## 5. Shipping Mode Breakdown & SLA Miscalibration
+
+| shipping_mode   |   Items |   Late_Items |   Avg_Real_Days |   Avg_Sched_Days |   Late_Rate_% | Contractual_OTD_% |
+|:----------------|--------:|-------------:|----------------:|-----------------:|--------------:|------------------:|
+| First Class     |   27814 |        26513 |        2.000000 |                1 |         95.32 |              4.68 |
+| Same Day        |    9737 |         4454 |        0.478279 |                0 |         45.74 |             54.26 |
+| Second Class    |   35216 |        26987 |        3.990830 |                2 |         76.63 |             23.37 |
+| Standard Class  |  107752 |        41023 |        3.995910 |                4 |         38.07 |             61.93 |
+

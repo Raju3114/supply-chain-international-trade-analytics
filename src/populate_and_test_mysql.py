@@ -154,21 +154,41 @@ def populate_mysql():
     query1 = """
     SELECT 
         m.shipping_mode,
-        COUNT(f.order_item_id) AS total_items_shipped,
+        COUNT(f.order_item_id) AS total_items_placed,
+        SUM(CASE WHEN f.is_canceled = 0 THEN 1 ELSE 0 END) AS total_items_shipped,
         SUM(f.is_late) AS total_late_items,
+        ROUND(SUM(f.is_on_time) * 100.0 / SUM(CASE WHEN f.is_canceled = 0 THEN 1 ELSE 0 END), 2) AS otd_rate_shipped_pct,
+        ROUND(SUM(f.is_on_time) * 100.0 / COUNT(f.order_item_id), 2) AS otd_rate_placed_pct,
         ROUND(SUM(f.is_late) * 100.0 / COUNT(f.order_item_id), 2) AS late_delivery_rate_pct,
-        ROUND(SUM(f.is_on_time) * 100.0 / COUNT(f.order_item_id), 2) AS on_time_delivery_rate_pct,
-        ROUND(AVG(f.days_shipping_scheduled), 2) AS avg_scheduled_days,
-        ROUND(AVG(f.days_shipping_real), 2) AS avg_real_days,
-        ROUND(AVG(f.delay_days), 2) AS avg_delay_variance_days
+        ROUND(AVG(f.delay_days), 2) AS delay_variance_days,
+        ROUND(AVG(CASE WHEN f.is_late = 1 THEN f.delay_days ELSE NULL END), 2) AS positive_late_delay_days
     FROM fact_shipments f
     JOIN dim_shipping_mode m ON f.shipping_mode_id = m.shipping_mode_id
     GROUP BY m.shipping_mode
     ORDER BY late_delivery_rate_pct DESC;
     """
     my_cur.execute(query1)
-    rows = my_cur.fetchall()
-    print(tabulate(rows, headers="keys", tablefmt="psql"))
+    rows1 = my_cur.fetchall()
+    print(tabulate(rows1, headers="keys", tablefmt="psql"))
+
+    # Execute Analytical Query 7 on MySQL
+    print("\nExecuting Query 7 (Customs & Simulated Freight Costs) on Live MySQL Server...")
+    query7 = """
+    SELECT 
+        c.sim_carrier_partner,
+        COUNT(DISTINCT c.order_id) AS total_declarations,
+        ROUND(AVG(c.sim_dwell_time_days), 2) AS avg_customs_dwell_days,
+        SUM(CASE WHEN c.sim_demurrage_days > 0 THEN 1 ELSE 0 END) AS demurrage_impacted_orders,
+        ROUND(SUM(c.sim_demurrage_incurred_usd), 2) AS total_demurrage_usd,
+        ROUND(SUM(c.sim_freight_cost_usd), 2) AS total_sim_freight_usd,
+        ROUND(AVG(c.sim_freight_cost_usd), 2) AS avg_freight_per_order_usd
+    FROM fact_customs_declarations c
+    GROUP BY c.sim_carrier_partner
+    ORDER BY total_demurrage_usd DESC;
+    """
+    my_cur.execute(query7)
+    rows7 = my_cur.fetchall()
+    print(tabulate(rows7, headers="keys", tablefmt="psql"))
 
     sq_conn.close()
     my_conn.close()
@@ -176,3 +196,4 @@ def populate_mysql():
 
 if __name__ == "__main__":
     populate_mysql()
+

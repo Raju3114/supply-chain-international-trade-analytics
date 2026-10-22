@@ -23,14 +23,24 @@ def python_metrics():
     total_orders = df["order_id"].nunique()
     late_items = df["is_late"].sum()
     on_time_items = df["is_on_time"].sum()
+    canceled_items = df["is_canceled"].sum()
+    shipped_items = total_items - canceled_items
+    
     gross_sales = df["sales_gross"].sum()
     net_profit = df["benefit_per_order"].sum()
+    
+    overall_variance = df["delay_days"].mean()
+    positive_delay = df[df["is_late"] == 1]["delay_days"].mean()
     
     return {
         "total_items": total_items,
         "total_orders": total_orders,
-        "late_rate_pct": round(late_items * 100.0 / total_items, 2),
-        "on_time_rate_pct": round(on_time_items * 100.0 / total_items, 2),
+        "otd_shipped_base_pct": round(on_time_items * 100.0 / shipped_items, 2),
+        "otd_total_base_pct": round(on_time_items * 100.0 / total_items, 2),
+        "late_rate_shipped_base_pct": round(late_items * 100.0 / shipped_items, 2),
+        "late_rate_total_base_pct": round(late_items * 100.0 / total_items, 2),
+        "delay_variance_days": round(overall_variance, 2),
+        "positive_delay_days": round(positive_delay, 2),
         "gross_sales_usd": round(gross_sales, 2),
         "net_profit_usd": round(net_profit, 2)
     }
@@ -42,8 +52,12 @@ def sql_metrics():
     SELECT 
         COUNT(order_item_id) AS total_items,
         COUNT(DISTINCT order_id) AS total_orders,
-        ROUND(SUM(is_late) * 100.0 / COUNT(order_item_id), 2) AS late_rate_pct,
-        ROUND(SUM(is_on_time) * 100.0 / COUNT(order_item_id), 2) AS on_time_rate_pct,
+        ROUND(SUM(is_on_time) * 100.0 / SUM(CASE WHEN is_canceled = 0 THEN 1 ELSE 0 END), 2) AS otd_shipped_base_pct,
+        ROUND(SUM(is_on_time) * 100.0 / COUNT(order_item_id), 2) AS otd_total_base_pct,
+        ROUND(SUM(is_late) * 100.0 / SUM(CASE WHEN is_canceled = 0 THEN 1 ELSE 0 END), 2) AS late_rate_shipped_base_pct,
+        ROUND(SUM(is_late) * 100.0 / COUNT(order_item_id), 2) AS late_rate_total_base_pct,
+        ROUND(AVG(delay_days), 2) AS delay_variance_days,
+        ROUND(AVG(CASE WHEN is_late = 1 THEN delay_days ELSE NULL END), 2) AS positive_delay_days,
         ROUND(SUM(sales_gross), 2) AS gross_sales_usd,
         ROUND(SUM(benefit_per_order), 2) AS net_profit_usd
     FROM fact_shipments;

@@ -100,19 +100,34 @@ def generate_model_bim():
                             "formatString": "#,##0"
                         },
                         {
-                            "name": "On-Time Delivery Rate %",
+                            "name": "On-Time Delivery Rate % (Shipped Base)",
+                            "expression": "DIVIDE([On-Time Deliveries], CALCULATE(COUNTROWS(fact_shipments), fact_shipments[is_canceled] = 0), 0)",
+                            "formatString": "0.00%"
+                        },
+                        {
+                            "name": "On-Time Delivery Rate % (Total Placed Base)",
                             "expression": "DIVIDE([On-Time Deliveries], [Total Order Items], 0)",
                             "formatString": "0.00%"
                         },
                         {
-                            "name": "Late Delivery Rate %",
+                            "name": "Late Delivery Rate % (Shipped Base)",
+                            "expression": "DIVIDE([Late Deliveries], CALCULATE(COUNTROWS(fact_shipments), fact_shipments[is_canceled] = 0), 0)",
+                            "formatString": "0.00%"
+                        },
+                        {
+                            "name": "Late Delivery Rate % (Total Placed Base)",
                             "expression": "DIVIDE([Late Deliveries], [Total Order Items], 0)",
                             "formatString": "0.00%"
                         },
                         {
-                            "name": "Avg Delay Days",
+                            "name": "Positive Delay Days (Late Shipments)",
                             "expression": "CALCULATE(AVERAGE(fact_shipments[delay_days]), fact_shipments[is_late] = 1)",
                             "formatString": "0.00"
+                        },
+                        {
+                            "name": "Overall Delay Variance Days",
+                            "expression": "AVERAGE(fact_shipments[delay_days])",
+                            "formatString": "+0.00;-0.00;0.00"
                         }
                     ]
                 },
@@ -135,7 +150,9 @@ def generate_model_bim():
                         {"name": "sim_free_days_limit", "dataType": "double", "sourceColumn": "sim_free_days_limit"},
                         {"name": "sim_demurrage_days", "dataType": "double", "sourceColumn": "sim_demurrage_days"},
                         {"name": "sim_demurrage_incurred_usd", "dataType": "double", "sourceColumn": "sim_demurrage_incurred_usd", "formatString": "$#,##0.00"},
-                        {"name": "sim_duty_amount_usd", "dataType": "double", "sourceColumn": "sim_duty_amount_usd", "formatString": "$#,##0.00"}
+                        {"name": "sim_duty_amount_usd", "dataType": "double", "sourceColumn": "sim_duty_amount_usd", "formatString": "$#,##0.00"},
+                        {"name": "sim_chargeable_weight_kg", "dataType": "double", "sourceColumn": "sim_chargeable_weight_kg", "formatString": "#,##0.0 kg"},
+                        {"name": "sim_freight_cost_usd", "dataType": "double", "sourceColumn": "sim_freight_cost_usd", "formatString": "$#,##0.00"}
                     ],
                     "measures": [
                         {
@@ -152,6 +169,16 @@ def generate_model_bim():
                             "name": "[SIM] Doc Discrepancy Rate %",
                             "expression": "DIVIDE(CALCULATE(COUNTROWS(fact_customs_declarations), fact_customs_declarations[sim_doc_discrepancy_flag] = 1), COUNTROWS(fact_customs_declarations), 0)",
                             "formatString": "0.00%"
+                        },
+                        {
+                            "name": "[SIM] Total Freight Expense USD",
+                            "expression": "SUM(fact_customs_declarations[sim_freight_cost_usd])",
+                            "formatString": "$#,##0.00"
+                        },
+                        {
+                            "name": "[SIM] Avg Freight Cost per Consignment",
+                            "expression": "AVERAGE(fact_customs_declarations[sim_freight_cost_usd])",
+                            "formatString": "$#,##0.00"
                         }
                     ]
                 },

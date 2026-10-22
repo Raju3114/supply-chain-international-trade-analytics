@@ -150,6 +150,14 @@ def generate_customs_extension(seed: int = 42):
         # Modeled customs duty amount
         duty_usd = round(row["total_order_value"] * tariff_rate, 2)
         
+        # Modeled Logistics Freight Expense [SIMULATED]
+        # Chargeable weight modeled on automotive parts (15kg to 120kg depending on item count)
+        chargeable_weight_kg = round(15.0 + (row["items_in_order"] * 18.5) + np.random.uniform(2.0, 15.0), 1)
+        # Modeled freight rate per kg depending on transit urgency
+        # Standard: ~$1.80/kg, Second Class: ~$3.20/kg, First Class / Same Day: ~$5.50/kg
+        base_rate_per_kg = 1.80 if "Standard" in trade_lane else (3.20 if "Second" in trade_lane else 4.90)
+        freight_cost_usd = round(chargeable_weight_kg * base_rate_per_kg, 2)
+
         declarations.append({
             "sim_declaration_id": dec_id,
             "order_id": order_id,
@@ -167,7 +175,9 @@ def generate_customs_extension(seed: int = 42):
             "sim_free_days_limit": free_days,
             "sim_demurrage_days": round(demurrage_days, 2),
             "sim_demurrage_incurred_usd": demurrage_fee_usd,
-            "sim_duty_amount_usd": duty_usd
+            "sim_duty_amount_usd": duty_usd,
+            "sim_chargeable_weight_kg": chargeable_weight_kg,
+            "sim_freight_cost_usd": freight_cost_usd
         })
 
     ext_df = pd.DataFrame(declarations)
@@ -182,8 +192,11 @@ def generate_customs_extension(seed: int = 42):
     # Document Lineage & Statistics
     write_lineage_doc(ext_df, LINEAGE_DOC)
     
-    # Also attach table to SQLite database
+    # Attach table to SQLite database
     attach_to_sqlite(ext_df)
+    
+    # Attach table to Live MySQL database
+    attach_to_mysql(ext_df)
     
     return ext_df
 
@@ -214,6 +227,8 @@ def attach_to_sqlite(ext_df):
         sim_demurrage_days REAL NOT NULL,
         sim_demurrage_incurred_usd REAL NOT NULL,
         sim_duty_amount_usd REAL NOT NULL,
+        sim_chargeable_weight_kg REAL NOT NULL,
+        sim_freight_cost_usd REAL NOT NULL,
         FOREIGN KEY (order_id) REFERENCES fact_shipments(order_id)
     );
     """)
@@ -225,6 +240,52 @@ def attach_to_sqlite(ext_df):
     conn.commit()
     conn.close()
     print("  -> fact_customs_declarations successfully created and indexed in SQLite.")
+
+def attach_to_mysql(ext_df):
+    try:
+        import pymysql
+        print("\nAttaching fact_customs_declarations to Live MySQL database...")
+        conn = pymysql.connect(
+            host="127.0.0.1", port=3306, user="root", database="supply_chain_dw"
+        )
+        cur = conn.cursor()
+        cur.execute("DROP TABLE IF EXISTS fact_customs_declarations;")
+        cur.execute("""
+        CREATE TABLE fact_customs_declarations (
+            sim_declaration_id VARCHAR(50) PRIMARY KEY,
+            order_id BIGINT NOT NULL,
+            sim_trade_lane VARCHAR(100) NOT NULL,
+            sim_carrier_partner VARCHAR(100) NOT NULL,
+            sim_customs_broker VARCHAR(100) NOT NULL,
+            sim_port_of_entry VARCHAR(100) NOT NULL,
+            sim_hs_chapter VARCHAR(10) NOT NULL,
+            sim_hs_code VARCHAR(20) NOT NULL,
+            sim_port_arrival_timestamp DATETIME NOT NULL,
+            sim_customs_release_timestamp DATETIME NOT NULL,
+            sim_dwell_time_days DECIMAL(6, 2) NOT NULL,
+            sim_inspection_channel VARCHAR(20) NOT NULL,
+            sim_doc_discrepancy_flag TINYINT NOT NULL,
+            sim_free_days_limit DECIMAL(4, 1) NOT NULL,
+            sim_demurrage_days DECIMAL(6, 2) NOT NULL,
+            sim_demurrage_incurred_usd DECIMAL(10, 2) NOT NULL,
+            sim_duty_amount_usd DECIMAL(10, 2) NOT NULL,
+            sim_chargeable_weight_kg DECIMAL(8, 2) NOT NULL,
+            sim_freight_cost_usd DECIMAL(10, 2) NOT NULL,
+            INDEX idx_customs_order (order_id),
+            INDEX idx_customs_carrier (sim_carrier_partner),
+            INDEX idx_customs_channel (sim_inspection_channel)
+        ) ENGINE=InnoDB;
+        """)
+        
+        cols = list(ext_df.columns)
+        insert_sql = f"INSERT INTO fact_customs_declarations ({', '.join(cols)}) VALUES ({', '.join(['%s']*len(cols))})"
+        batch = [tuple(x) for x in ext_df.values]
+        cur.executemany(insert_sql, batch)
+        conn.commit()
+        conn.close()
+        print(f"  -> [PASS] Loaded {len(ext_df):,} customs declarations into live MySQL server.")
+    except Exception as e:
+        print(f"  -> Notice: MySQL sync skipped or error: {e}")
 
 def write_lineage_doc(df, path):
     total = len(df)

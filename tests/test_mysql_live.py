@@ -40,35 +40,46 @@ def test_mysql_server_connection(mysql_connection):
         print(f"\nConnected to live MySQL engine version: {res['ver']}")
 
 def test_mysql_tables_exist(mysql_connection):
-    """Verify all 6 Star Schema tables exist in MySQL database."""
+    """Verify all 7 tables (Star Schema + Customs extension) exist in MySQL database."""
     with mysql_connection.cursor() as cur:
         cur.execute("SHOW TABLES;")
         tables = [list(r.values())[0] for r in cur.fetchall()]
         expected_tables = [
             "dim_customer_geo", "dim_date", "dim_order_destination",
-            "dim_product", "dim_shipping_mode", "fact_shipments"
+            "dim_product", "dim_shipping_mode", "fact_shipments",
+            "fact_customs_declarations"
         ]
         for tbl in expected_tables:
             assert tbl in tables, f"Missing table in MySQL: {tbl}"
 
 def test_mysql_fact_row_count(mysql_connection):
-    """Verify fact_shipments in MySQL matches 180,519 rows exactly."""
+    """Verify fact_shipments and fact_customs_declarations row counts in MySQL."""
     with mysql_connection.cursor() as cur:
         cur.execute("SELECT COUNT(*) AS total FROM fact_shipments;")
         res = cur.fetchone()
         assert res['total'] == EXPECTED_FACT_ROWS, f"Row count mismatch in MySQL: {res['total']} vs {EXPECTED_FACT_ROWS}"
+        
+        cur.execute("SELECT COUNT(*) AS total_customs FROM fact_customs_declarations;")
+        res_c = cur.fetchone()
+        assert res_c['total_customs'] == 65752, f"Customs row count mismatch in MySQL: {res_c['total_customs']}"
 
 def test_mysql_analytical_query(mysql_connection):
-    """Verify analytical aggregation query on live MySQL server."""
+    """Verify analytical aggregation query on live MySQL server including dual OTD rates."""
     with mysql_connection.cursor() as cur:
         cur.execute("""
             SELECT 
                 COUNT(*) AS total_items,
                 SUM(is_late) AS late_items,
-                ROUND(SUM(is_late) * 100.0 / COUNT(*), 2) AS late_pct
+                ROUND(SUM(is_on_time) * 100.0 / SUM(CASE WHEN is_canceled = 0 THEN 1 ELSE 0 END), 2) AS otd_shipped_pct,
+                ROUND(SUM(is_on_time) * 100.0 / COUNT(*), 2) AS otd_total_pct,
+                ROUND(SUM(is_late) * 100.0 / COUNT(*), 2) AS late_pct,
+                ROUND(AVG(delay_days), 2) AS delay_variance_days
             FROM fact_shipments;
         """)
         res = cur.fetchone()
         assert res['total_items'] == EXPECTED_FACT_ROWS
         assert res['late_items'] == 98977
+        assert float(res['otd_shipped_pct']) == 42.71
+        assert float(res['otd_total_pct']) == 40.88
         assert float(res['late_pct']) == 54.83
+        assert float(res['delay_variance_days']) == 0.57

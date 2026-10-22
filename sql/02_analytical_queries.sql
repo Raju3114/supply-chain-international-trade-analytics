@@ -13,13 +13,16 @@
 -- ------------------------------------------------------------------------
 SELECT 
     m.shipping_mode,
-    COUNT(f.order_item_id) AS total_items_shipped,
+    COUNT(f.order_item_id) AS total_items_placed,
+    SUM(CASE WHEN f.is_canceled = 0 THEN 1 ELSE 0 END) AS total_items_shipped,
     SUM(f.is_late) AS total_late_items,
+    ROUND(SUM(f.is_on_time) * 100.0 / SUM(CASE WHEN f.is_canceled = 0 THEN 1 ELSE 0 END), 2) AS otd_rate_shipped_base_pct,
+    ROUND(SUM(f.is_on_time) * 100.0 / COUNT(f.order_item_id), 2) AS otd_rate_total_placed_base_pct,
     ROUND(SUM(f.is_late) * 100.0 / COUNT(f.order_item_id), 2) AS late_delivery_rate_pct,
-    ROUND(SUM(f.is_on_time) * 100.0 / COUNT(f.order_item_id), 2) AS on_time_delivery_rate_pct,
     ROUND(AVG(f.days_shipping_scheduled), 2) AS avg_scheduled_days,
     ROUND(AVG(f.days_shipping_real), 2) AS avg_real_days,
-    ROUND(AVG(f.delay_days), 2) AS avg_delay_variance_days,
+    ROUND(AVG(f.delay_days), 2) AS delay_variance_days,
+    ROUND(AVG(CASE WHEN f.is_late = 1 THEN f.delay_days ELSE NULL END), 2) AS positive_late_delay_days,
     ROUND(SUM(f.sales_gross), 2) AS total_gross_sales_usd
 FROM fact_shipments f
 JOIN dim_shipping_mode m ON f.shipping_mode_id = m.shipping_mode_id
@@ -192,3 +195,24 @@ SELECT
 FROM fact_shipments f
 LEFT JOIN dim_order_destination d ON f.destination_id = d.destination_id
 WHERE d.destination_id IS NULL;
+
+
+-- ------------------------------------------------------------------------
+-- QUERY 7: Cross-Border Trade Lane Customs Dwell & Modeled Freight Costs [SIMULATION]
+-- Business Question: What is the average customs clearance dwell time, total 
+-- demurrage penalty exposure, and modeled logistics freight cost across carrier partners?
+-- Techniques: 1-to-1 Table Join (fact_shipments -> fact_customs_declarations), Aggregation
+-- ------------------------------------------------------------------------
+SELECT 
+    c.sim_carrier_partner,
+    COUNT(DISTINCT c.order_id) AS total_customs_declarations,
+    ROUND(AVG(c.sim_dwell_time_days), 2) AS avg_customs_dwell_days,
+    SUM(CASE WHEN c.sim_demurrage_days > 0 THEN 1 ELSE 0 END) AS demurrage_impacted_orders,
+    ROUND(SUM(c.sim_demurrage_incurred_usd), 2) AS total_demurrage_incurred_usd,
+    ROUND(SUM(c.sim_freight_cost_usd), 2) AS total_sim_freight_cost_usd,
+    ROUND(AVG(c.sim_freight_cost_usd), 2) AS avg_freight_cost_per_order_usd,
+    ROUND(SUM(c.sim_doc_discrepancy_flag) * 100.0 / COUNT(c.order_id), 2) AS doc_discrepancy_rate_pct
+FROM fact_customs_declarations c
+GROUP BY c.sim_carrier_partner
+ORDER BY total_demurrage_incurred_usd DESC;
+

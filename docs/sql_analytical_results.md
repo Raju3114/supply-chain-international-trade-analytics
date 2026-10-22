@@ -20,13 +20,16 @@ Database: `data/supply_chain_analytics.db` (Star Schema)
 -- ------------------------------------------------------------------------
 SELECT 
     m.shipping_mode,
-    COUNT(f.order_item_id) AS total_items_shipped,
+    COUNT(f.order_item_id) AS total_items_placed,
+    SUM(CASE WHEN f.is_canceled = 0 THEN 1 ELSE 0 END) AS total_items_shipped,
     SUM(f.is_late) AS total_late_items,
+    ROUND(SUM(f.is_on_time) * 100.0 / SUM(CASE WHEN f.is_canceled = 0 THEN 1 ELSE 0 END), 2) AS otd_rate_shipped_base_pct,
+    ROUND(SUM(f.is_on_time) * 100.0 / COUNT(f.order_item_id), 2) AS otd_rate_total_placed_base_pct,
     ROUND(SUM(f.is_late) * 100.0 / COUNT(f.order_item_id), 2) AS late_delivery_rate_pct,
-    ROUND(SUM(f.is_on_time) * 100.0 / COUNT(f.order_item_id), 2) AS on_time_delivery_rate_pct,
     ROUND(AVG(f.days_shipping_scheduled), 2) AS avg_scheduled_days,
     ROUND(AVG(f.days_shipping_real), 2) AS avg_real_days,
-    ROUND(AVG(f.delay_days), 2) AS avg_delay_variance_days,
+    ROUND(AVG(f.delay_days), 2) AS delay_variance_days,
+    ROUND(AVG(CASE WHEN f.is_late = 1 THEN f.delay_days ELSE NULL END), 2) AS positive_late_delay_days,
     ROUND(SUM(f.sales_gross), 2) AS total_gross_sales_usd
 FROM fact_shipments f
 JOIN dim_shipping_mode m ON f.shipping_mode_id = m.shipping_mode_id
@@ -36,12 +39,12 @@ ORDER BY late_delivery_rate_pct DESC
 
 ### Result (First 15 rows):
 
-| shipping_mode   |   total_items_shipped |   total_late_items |   late_delivery_rate_pct |   on_time_delivery_rate_pct |   avg_scheduled_days |   avg_real_days |   avg_delay_variance_days |   total_gross_sales_usd |
-|:----------------|----------------------:|-------------------:|-------------------------:|----------------------------:|---------------------:|----------------:|--------------------------:|------------------------:|
-| First Class     |                 27814 |              26513 |                    95.32 |                        0    |                    1 |            2    |                      1    |             5.67437e+06 |
-| Second Class    |                 35216 |              26987 |                    76.63 |                       19.36 |                    2 |            3.99 |                      1.99 |             7.14544e+06 |
-| Same Day        |                  9737 |               4454 |                    45.74 |                       49.7  |                    0 |            0.48 |                      0.48 |             1.94253e+06 |
-| Standard Class  |                107752 |              41023 |                    38.07 |                       57.66 |                    4 |            4    |                     -0    |             2.20224e+07 |
+| shipping_mode   |   total_items_placed |   total_items_shipped |   total_late_items |   otd_rate_shipped_base_pct |   otd_rate_total_placed_base_pct |   late_delivery_rate_pct |   avg_scheduled_days |   avg_real_days |   delay_variance_days |   positive_late_delay_days |   total_gross_sales_usd |
+|:----------------|---------------------:|----------------------:|-------------------:|----------------------------:|---------------------------------:|-------------------------:|---------------------:|----------------:|----------------------:|---------------------------:|------------------------:|
+| First Class     |                27814 |                 26513 |              26513 |                        0    |                             0    |                    95.32 |                    1 |            2    |                  1    |                       1    |             5.67437e+06 |
+| Second Class    |                35216 |                 33806 |              26987 |                       20.17 |                            19.36 |                    76.63 |                    2 |            3.99 |                  1.99 |                       2.5  |             7.14544e+06 |
+| Same Day        |                 9737 |                  9293 |               4454 |                       52.07 |                            49.7  |                    45.74 |                    0 |            0.48 |                  0.48 |                       1    |             1.94253e+06 |
+| Standard Class  |               107752 |                103153 |              41023 |                       60.23 |                            57.66 |                    38.07 |                    4 |            4    |                 -0    |                       1.51 |             2.20224e+07 |
 
 ## Query 2: Global Market Delivery Performance & Profitability
 
@@ -298,4 +301,37 @@ WHERE d.destination_id IS NULL
 | Negative Real Shipping Duration           |                 0 |
 | Orphan Product Records (Unmatched FK)     |                 0 |
 | Orphan Destination Records (Unmatched FK) |                 0 |
+
+## Query 7: Cross-Border Trade Lane Demurrage & Modeled Freight Costs [SIMULATION]
+
+```sql
+-- ------------------------------------------------------------------------
+-- QUERY 7: Cross-Border Trade Lane Customs Dwell & Modeled Freight Costs [SIMULATION]
+-- Business Question: What is the average customs clearance dwell time, total 
+-- demurrage penalty exposure, and modeled logistics freight cost across carrier partners?
+-- Techniques: 1-to-1 Table Join (fact_shipments -> fact_customs_declarations), Aggregation
+-- ------------------------------------------------------------------------
+SELECT 
+    c.sim_carrier_partner,
+    COUNT(DISTINCT c.order_id) AS total_customs_declarations,
+    ROUND(AVG(c.sim_dwell_time_days), 2) AS avg_customs_dwell_days,
+    SUM(CASE WHEN c.sim_demurrage_days > 0 THEN 1 ELSE 0 END) AS demurrage_impacted_orders,
+    ROUND(SUM(c.sim_demurrage_incurred_usd), 2) AS total_demurrage_incurred_usd,
+    ROUND(SUM(c.sim_freight_cost_usd), 2) AS total_sim_freight_cost_usd,
+    ROUND(AVG(c.sim_freight_cost_usd), 2) AS avg_freight_cost_per_order_usd,
+    ROUND(SUM(c.sim_doc_discrepancy_flag) * 100.0 / COUNT(c.order_id), 2) AS doc_discrepancy_rate_pct
+FROM fact_customs_declarations c
+GROUP BY c.sim_carrier_partner
+ORDER BY total_demurrage_incurred_usd DESC
+```
+
+### Result (First 15 rows):
+
+| sim_carrier_partner         |   total_customs_declarations |   avg_customs_dwell_days |   demurrage_impacted_orders |   total_demurrage_incurred_usd |   total_sim_freight_cost_usd |   avg_freight_cost_per_order_usd |   doc_discrepancy_rate_pct |
+|:----------------------------|-----------------------------:|-------------------------:|----------------------------:|-------------------------------:|-----------------------------:|---------------------------------:|---------------------------:|
+| Maersk Line                 |                        13185 |                     1.7  |                        1764 |                         442617 |                  4.79318e+06 |                           363.53 |                       6.05 |
+| CMA CGM Group               |                        13192 |                     1.69 |                        1707 |                         439582 |                  4.81011e+06 |                           364.62 |                       5.91 |
+| Hapag-Lloyd Logistics       |                        13215 |                     1.68 |                        1675 |                         439333 |                  4.79447e+06 |                           362.81 |                       5.41 |
+| MSC Mediterranean Shipping  |                        12922 |                     1.69 |                        1720 |                         439281 |                  4.71401e+06 |                           364.8  |                       5.73 |
+| Ocean Network Express (ONE) |                        13238 |                     1.68 |                        1692 |                         429347 |                  4.82575e+06 |                           364.54 |                       5.84 |
 

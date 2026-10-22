@@ -32,14 +32,15 @@ def execute_queries():
         "Query 3: Top Product Categories by Revenue and Delay Ranking (Window Functions)",
         "Query 4: Monthly Trajectory & 3-Month Moving Average (Window Functions)",
         "Query 5: Order-Level Fulfillment Status Funnel",
-        "Query 6: Relational Data Quality Exception Audit"
+        "Query 6: Relational Data Quality Exception Audit",
+        "Query 7: Cross-Border Trade Lane Demurrage & Modeled Freight Costs [SIMULATION]"
     ]
 
     results_md = ["# SQL Analytics: Query Execution & Results\n\n"]
     results_md.append("Database: `data/supply_chain_analytics.db` (Star Schema)\n\n")
 
     for idx, (title, stmt) in enumerate(zip(query_titles, statements), 1):
-        print(f"\n[{idx}/6] Executing {title}...")
+        print(f"\n[{idx}/{len(query_titles)}] Executing {title}...")
         try:
             df = pd.read_sql_query(stmt, conn)
             print(tabulate(df.head(10), headers="keys", tablefmt="psql", showindex=False))
