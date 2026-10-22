@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter
+.ipynb_checkpoints
+
+# Environment variables & secrets
+.env
+*.local
+credentials.json
+*.pem
+
+# IDEs
+.vscode/
+.idea/
+
+# Large raw datasets (track metadata, ignore huge raw CSVs in git commits)
+data/raw/*.csv
+data/processed/*.parquet
+data/processed/*.csv
+!data/raw/DescriptionDataCoSupplyChain.csv
+
+# SQLite DB files
+*.db
+*.sqlite
+*.sqlite3
+
+# OS generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
